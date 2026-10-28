@@ -1,0 +1,40 @@
+name: Build APK
+on:
+  push:
+  workflow_dispatch:
+
+env:
+  APP_LABEL: "سیوا حساب"
+  APK_NAME: SivaHesab
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Find project
+        run: |
+          DIR=$(dirname "$(find . -name pubspec.yaml -not -path './.git/*' | head -1)")
+          echo "Project folder: $DIR"
+          if [ "$DIR" != "." ]; then cp -r "$DIR"/. . ; fi
+          ls
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+      - uses: subosito/flutter-action@v2
+        with:
+          channel: stable
+      - name: Generate android folder
+        run: |
+          NAME=$(grep -m1 '^name:' pubspec.yaml | awk '{print $2}')
+          flutter create --project-name "$NAME" --org ir.siva --platforms=android _gen
+          cp -r _gen/android android
+          sed -i "s/android:label=\"[^\"]*\"/android:label=\"$APP_LABEL\"/" android/app/src/main/AndroidManifest.xml
+      - run: flutter pub get
+      - run: flutter analyze --no-fatal-infos --no-fatal-warnings || true
+      - run: flutter build apk --release
+      - uses: actions/upload-artifact@v4
+        with:
+          name: ${{ env.APK_NAME }}-APK
+          path: build/app/outputs/flutter-apk/app-release.apk
